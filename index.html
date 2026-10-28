@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inclined Plane Simulator</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --accent: #4263eb;
+  --accent-light: #748ffc;
+  --card: #fff;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #e2e8f0;
+}
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(160deg, #e8edfb 0%, #dde5f8 100%);
+  min-height: 100vh;
+  padding: 16px;
+  color: var(--text);
+}
+.app { max-width: 840px; margin: 0 auto; }
+header { text-align: center; padding: 6px 0 16px; }
+header h1 { font-size: 1.45rem; font-weight: 700; color: #1e3a5f; }
+header p { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+.card {
+  background: var(--card);
+  border-radius: 18px;
+  box-shadow: 0 2px 22px rgba(66,99,235,.09), 0 1px 4px rgba(0,0,0,.06);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.canvas-wrap {
+  padding: 10px 10px 0;
+  background: linear-gradient(180deg, #a8c8f0 0%, #cde0f8 70%, #c8e0c8 100%);
+  border-radius: 10px 10px 0 0;
+}
+#canvas { display: block; width: 100%; border-radius: 8px 8px 0 0; }
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 22px;
+  padding: 18px 20px 12px;
+}
+@media (max-width: 520px) { .controls { grid-template-columns: 1fr; } }
+.field label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 0.74rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--muted); margin-bottom: 7px;
+}
+.val { font-size: .88rem; font-weight: 700; color: var(--accent); text-transform: none; letter-spacing: 0; }
+input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 5px;
+  border-radius: 3px; background: var(--border); outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 1px 6px rgba(66,99,235,.4);
+  cursor: pointer; transition: transform .1s;
+}
+input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2); }
+input[type=range]::-moz-range-thumb {
+  width: 18px; height: 18px; border: none; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+}
+select {
+  width: 100%; padding: 7px 28px 7px 10px;
+  border: 1.5px solid var(--border); border-radius: 9px;
+  font-size: .87rem; color: var(--text); outline: none; cursor: pointer;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2364748b'/%3E%3C/svg%3E") no-repeat right 10px center;
+  -webkit-appearance: none; appearance: none;
+}
+select:focus { border-color: var(--accent); }
+.btn-row { display: flex; gap: 10px; padding: 2px 20px 18px; }
+.btn { flex: 1; padding: 11px; border: none; border-radius: 10px; font-size: .92rem; font-weight: 600; cursor: pointer; transition: all .15s; letter-spacing: .2px; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-light)); color: #fff; box-shadow: 0 3px 12px rgba(66,99,235,.35); }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 18px rgba(66,99,235,.45); }
+.btn-primary:disabled { background: #94a3b8; box-shadow: none; cursor: not-allowed; transform: none; }
+.btn-secondary { background: #f1f5f9; color: var(--muted); border: 1.5px solid var(--border); }
+.btn-secondary:hover { background: var(--border); color: var(--text); }
+.info-card { background: #fff; border-radius: 18px; box-shadow: 0 2px 20px rgba(66,99,235,.08); padding: 16px 20px 18px; }
+.info-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.status-badge { font-size: .85rem; font-weight: 600; color: var(--muted); }
+.status-badge.sliding  { color: #c2410c; }
+.status-badge.static   { color: #166534; }
+.status-badge.finished { color: #5b21b6; }
+.mu-display { margin-left: auto; font-size: .78rem; color: var(--muted); }
+.mu-display strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+@media (max-width: 520px) { .stats { grid-template-columns: repeat(2,1fr); } }
+.stat-box { background: #f8fafc; border-radius: 10px; padding: 10px 8px; text-align: center; border: 1px solid #f1f5f9; }
+.stat-val { font-size: 1.05rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+.stat-lbl { font-size: .65rem; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .3px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Inclined Plane Physics Simulator</h1>
+  </header>
+
+  <div class="card">
+    <div class="canvas-wrap">
+      <canvas id="canvas" width="800" height="380" aria-label="Physics simulation of a block on an inclined plane"></canvas>
+    </div>
+    <div class="controls">
+      <div class="field">
+        <label>Angle <span class="val" id="lblAngle">30°</span></label>
+        <input type="range" id="sAngle" min="0" max="75" step="1" value="30">
+      </div>
+      <div class="field">
+        <label>Mass <span class="val" id="lblMass">2.0 kg</span></label>
+        <input type="range" id="sMass" min="0.5" max="10" step="0.5" value="2.0">
+      </div>
+      <div class="field">
+        <label>Material</label>
+        <select id="selMaterial">
+          <option value="">Custom (manual slider)</option>
+          <option value="0.05">Ice on Ice — μ 0.05</option>
+          <option value="0.10">Glass on Glass — μ 0.10</option>
+          <option value="0.15">Metal on Metal — μ 0.15</option>
+          <option value="0.20">Wet Concrete — μ 0.20</option>
+          <option value="0.40" selected>Wood on Wood — μ 0.40</option>
+          <option value="0.55">Brick on Concrete — μ 0.55</option>
+          <option value="0.70">Rubber on Road — μ 0.70</option>
+          <option value="0.80">Sandpaper on Wood — μ 0.80</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Friction μs <span class="val" id="lblMu">0.40</span></label>
+        <input type="range" id="sFriction" min="0.01" max="1.00" step="0.01" value="0.40">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnStart">Start</button>
+      <button class="btn btn-secondary" id="btnReset">Reset</button>
+    </div>
+  </div>
+
+  <div class="info-card">
+    <div class="info-header">
+      <span class="status-badge" id="statusBadge">
+        <span id="statusText">Ready</span>
+      </span>
+      <span class="mu-display">
+        μk = <strong id="muK">—</strong> &nbsp;|&nbsp;
+        θcrit = <strong id="critAngle">—</strong>
+      </span>
+    </div>
+    <div class="stats">
+      <div class="stat-box"><div class="stat-val" id="stAccel">—</div><div class="stat-lbl">Accel (m/s²)</div></div>
+      <div class="stat-box"><div class="stat-val" id="stVel">—</div><div class="stat-lbl">Velocity (m/s)</div></div>
+      <div class="stat-box"><div class="stat-val" id="stDist">—</div><div class="stat-lbl">Distance (m)</div></div>
+      <div class="stat-box"><div class="stat-val" id="stNet">—</div><div class="stat-lbl">Net Force (N)</div></div>
+      <div class="stat-box"><div class="stat-val" id="stWeight">—</div><div class="stat-lbl">Weight (N)</div></div>
+      <div class="stat-box"><div class="stat-val" id="stNormal">—</div><div class="stat-lbl">Normal (N)</div></div>
+      <div class="stat-box"><div class="stat-val" id="stFric">—</div><div class="stat-lbl">Friction (N)</div></div>
+      <div class="stat-box"><div class="stat-val" id="stTime">—</div><div class="stat-lbl">Time (s)</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────
+const G         = 9.8;
+const PLANK_M   = 5;      // virtual plank length (metres)
+const K_RATIO   = 0.85;   // μk = μs × K_RATIO
+const THICKNESS = 14;     // plank visual thickness (px)
+const BLOCK_MAX = 52;     // largest block px size (at 10 kg)
+const ARC_R     = 52;     // angle arc radius (px)
+
+// ── CANVAS ────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const CW = canvas.width;   // 800
+const CH = canvas.height;  // 380
+const GY = 302;            // ground Y
+const PIV_X = 85;          // plank pivot x
+const PIV_Y = GY;          // plank pivot y
+
+// ── STATE ─────────────────────────────────────────────────────────
+let S = {
+  angle: 30, mass: 2.0, mu: 0.40,
+  pos: 0, vel: 0, accel: 0, time: 0,
+  sliding: false, finished: false, running: false,
+  animId: null, lastTs: null,
+};
+
+// ── GEOMETRY ──────────────────────────────────────────────────────
+function plankPx(deg) {
+  if (deg < 0.5) return Math.min(CW - PIV_X - 50, 530);
+  const th = deg * Math.PI / 180;
+  const MARGIN = 60;
+  const byH = (PIV_Y - MARGIN - (THICKNESS + BLOCK_MAX) * Math.cos(th)) / Math.sin(th);
+  const byW = (CW - PIV_X - 50) / Math.cos(th);
+  return Math.max(80, Math.min(byH, byW, 530));
+}
+
+function topEnd(deg) {
+  const th = deg * Math.PI / 180;
+  const L  = plankPx(deg);
+  return { th, L, x: PIV_X + L * Math.cos(th), y: PIV_Y - L * Math.sin(th) };
+}
+
+// Block bottom-centre ON plank top surface
+function blockSurf(deg, posM) {
+  const { x: tx, y: ty, th, L } = topEnd(deg);
+  const p = (posM / PLANK_M) * L;
+  const lx = tx - p * Math.cos(th);
+  const ly = ty + p * Math.sin(th);
+  return {
+    x: lx - THICKNESS * Math.sin(th),
+    y: ly - THICKNESS * Math.cos(th),
+    th,
+  };
+}
+
+function blockSz() { return Math.max(24, Math.min(BLOCK_MAX, 22 + S.mass * 3)); }
+
+function blockCentre(deg, posM) {
+  const { x, y, th } = blockSurf(deg, posM);
+  const h = blockSz() / 2;
+  return { x: x - h * Math.sin(th), y: y - h * Math.cos(th) };
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function arrow(x1,y1,x2,y2,color,label) {
+  const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy);
+  if (len<8) return;
+  const ux=dx/len, uy=dy/len, HL=11, HW=5;
+  ctx.lineWidth=2; ctx.strokeStyle=color; ctx.fillStyle=color;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2-ux*HL,y2-uy*HL); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-ux*HL-uy*HW, y2-uy*HL+ux*HW);
+  ctx.lineTo(x2-ux*HL+uy*HW, y2-uy*HL-ux*HW);
+  ctx.closePath(); ctx.fill();
+  if (label) {
+    ctx.font='bold 11px "Segoe UI",sans-serif'; ctx.fillStyle=color;
+    ctx.fillText(label, x2+ux*5-uy*13, y2+uy*5+ux*13);
+  }
+}
+
+// ── DRAW FUNCTIONS ────────────────────────────────────────────────
+function drawBg() {
+  // Sky
+  const sg=ctx.createLinearGradient(0,0,0,GY);
+  sg.addColorStop(0,'#a8c8f0'); sg.addColorStop(1,'#cce0f8');
+  ctx.fillStyle=sg; ctx.fillRect(0,0,CW,GY+1);
+  // Ground
+  const gg=ctx.createLinearGradient(0,GY,0,CH);
+  gg.addColorStop(0,'#6ba040'); gg.addColorStop(0.25,'#548030'); gg.addColorStop(1,'#3a5a1e');
+  ctx.fillStyle=gg; ctx.fillRect(0,GY,CW,CH-GY);
+  // Ground edge
+  ctx.strokeStyle='#4a7225'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,GY); ctx.lineTo(CW,GY); ctx.stroke();
+  // Texture dashes
+  ctx.strokeStyle='rgba(0,0,0,0.07)'; ctx.lineWidth=1;
+  for (let gx=5;gx<CW;gx+=22) {
+    ctx.beginPath(); ctx.moveTo(gx,GY+7); ctx.lineTo(gx+9,GY+7); ctx.stroke();
+  }
+}
+
+function drawSupport(deg) {
+  if (deg<1) return;
+  const {x:tx,y:ty}=topEnd(deg);
+  ctx.beginPath(); ctx.moveTo(PIV_X,PIV_Y); ctx.lineTo(tx,ty); ctx.lineTo(tx,PIV_Y); ctx.closePath();
+  const tg=ctx.createLinearGradient(PIV_X,PIV_Y,tx,ty);
+  tg.addColorStop(0,'#9fb0c8'); tg.addColorStop(1,'#7a8fa6');
+  ctx.fillStyle=tg; ctx.fill();
+  ctx.strokeStyle='#607088'; ctx.lineWidth=1; ctx.stroke();
+  // Right-angle marker
+  const cs=9;
+  ctx.strokeStyle='#5a6878'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(tx-cs,PIV_Y); ctx.lineTo(tx-cs,PIV_Y-cs); ctx.lineTo(tx,PIV_Y-cs); ctx.stroke();
+}
+
+function drawPlank(deg) {
+  const {th,L}=topEnd(deg);
+  ctx.save(); ctx.translate(PIV_X,PIV_Y); ctx.rotate(-th);
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.10)'; ctx.fillRect(2,2,L,THICKNESS);
+  // Body
+  const pg=ctx.createLinearGradient(0,-THICKNESS,0,0);
+  pg.addColorStop(0,'#e8d29e'); pg.addColorStop(0.45,'#c8a858'); pg.addColorStop(1,'#9a7028');
+  ctx.fillStyle=pg; ctx.fillRect(0,-THICKNESS,L,THICKNESS);
+  // Highlight
+  ctx.fillStyle='rgba(255,255,255,0.28)'; ctx.fillRect(0,-THICKNESS,L,3);
+  // Grain lines
+  ctx.strokeStyle='rgba(90,50,10,0.18)'; ctx.lineWidth=0.8;
+  for (let gx=30;gx<L-8;gx+=44) {
+    ctx.beginPath(); ctx.moveTo(gx,-THICKNESS+4); ctx.lineTo(gx+14,-3); ctx.stroke();
+  }
+  // Bottom shadow
+  ctx.fillStyle='rgba(0,0,0,0.20)'; ctx.fillRect(0,-1,L,2);
+  // Left cap
+  ctx.fillStyle='#7a5018'; ctx.fillRect(0,-THICKNESS,3,THICKNESS);
+  ctx.restore();
+}
+
+function drawTrail(deg, posM) {
+  if (posM<0.15) return;
+  const {x:tx,y:ty}=blockSurf(deg,0);
+  const {x:cx,y:cy}=blockSurf(deg,posM);
+  const grad=ctx.createLinearGradient(tx,ty,cx,cy);
+  grad.addColorStop(0,'rgba(66,99,235,0)');
+  grad.addColorStop(0.4,'rgba(66,99,235,0.07)');
+  grad.addColorStop(1,'rgba(66,99,235,0.18)');
+  ctx.strokeStyle=grad; ctx.lineWidth=blockSz()*0.75; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(tx,ty); ctx.lineTo(cx,cy); ctx.stroke();
+  ctx.lineCap='butt';
+}
+
+function drawBlock(deg, posM) {
+  const {x:bx,y:by,th}=blockSurf(deg,posM);
+  const sz=blockSz(), hw=sz/2, DX=9, DY=-7;
+  ctx.save(); ctx.translate(bx,by); ctx.rotate(-th);
+  // Cast shadow on plank
+  ctx.fillStyle='rgba(0,0,0,0.09)'; ctx.fillRect(-hw+3,3,sz+4,6);
+  // Right face
+  ctx.fillStyle='#243dc8';
+  ctx.beginPath();
+  ctx.moveTo(hw,0); ctx.lineTo(hw+DX,DY); ctx.lineTo(hw+DX,DY-sz); ctx.lineTo(hw,-sz);
+  ctx.closePath(); ctx.fill();
+  // Top face
+  ctx.fillStyle='#7090e8';
+  ctx.beginPath();
+  ctx.moveTo(-hw,-sz); ctx.lineTo(-hw+DX,-sz+DY); ctx.lineTo(hw+DX,-sz+DY); ctx.lineTo(hw,-sz);
+  ctx.closePath(); ctx.fill();
+  // Front face
+  const fg=ctx.createLinearGradient(-hw,-sz,hw,0);
+  fg.addColorStop(0,'#6882f6'); fg.addColorStop(1,'#3a58e8');
+  ctx.fillStyle=fg; ctx.fillRect(-hw,-sz,sz,sz);
+  // Highlights
+  ctx.strokeStyle='rgba(255,255,255,0.38)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(-hw+2,-sz+2); ctx.lineTo(-hw+2,-2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-hw+2,-sz+2); ctx.lineTo(hw-2,-sz+2); ctx.stroke();
+  // Border
+  ctx.strokeStyle='rgba(20,36,160,0.5)'; ctx.lineWidth=1; ctx.strokeRect(-hw,-sz,sz,sz);
+  // Mass label
+  const fs=sz<32?8:sz<42?10:11;
+  ctx.fillStyle='rgba(255,255,255,0.88)';
+  ctx.font=`bold ${fs}px "Segoe UI",sans-serif`; ctx.textAlign='center';
+  ctx.fillText(`${S.mass.toFixed(1)}kg`,0,-sz/2+fs/2);
+  ctx.textAlign='left';
+  ctx.restore();
+}
+
+function drawAngleArc(deg) {
+  const th=deg*Math.PI/180;
+  ctx.setLineDash([4,5]); ctx.strokeStyle='rgba(200,50,50,0.45)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(PIV_X,PIV_Y); ctx.lineTo(PIV_X+ARC_R+22,PIV_Y); ctx.stroke();
+  ctx.setLineDash([]);
+  if (deg<1) return;
+  ctx.beginPath(); ctx.arc(PIV_X,PIV_Y,ARC_R,-th,0,false);
+  ctx.strokeStyle='#d03030'; ctx.lineWidth=2; ctx.stroke();
+  const half=th/2;
+  const lx=PIV_X+(ARC_R+16)*Math.cos(half), ly=PIV_Y-(ARC_R+16)*Math.sin(half);
+  ctx.font='bold 13px "Segoe UI",sans-serif'; ctx.fillStyle='#b82020';
+  ctx.textAlign='center'; ctx.fillText(`${deg}°`,lx,ly+5); ctx.textAlign='left';
+}
+
+function drawForces(deg, posM) {
+  if (!S.running && !S.finished) return;
+  const {x:cx,y:cy}=blockCentre(deg,posM);
+  const th=deg*Math.PI/180, m=S.mass, μk=S.mu*K_RATIO, SC=3.0;
+  const W=m*G, N=m*G*Math.cos(th);
+  arrow(cx,cy, cx,cy+W*SC, '#e53e3e','W');
+  arrow(cx,cy, cx-N*SC*Math.sin(th), cy-N*SC*Math.cos(th), '#38a169','N');
+  const fric=S.sliding ? μk*m*G*Math.cos(th) : Math.min(m*G*Math.sin(th),S.mu*N);
+  if (fric>0.05)
+    arrow(cx,cy, cx+fric*SC*Math.cos(th), cy-fric*SC*Math.sin(th), '#d69e2e','f');
+}
+
+function drawOverlay(deg) {
+  const crit=Math.atan(S.mu)*180/Math.PI, willSlide=deg>crit;
+  const bx=CW-145, by=12, bw=138, bh=90;
+  ctx.fillStyle='rgba(255,255,255,0.76)';
+  roundRect(bx-7,by-5,bw+14,bh+10,10); ctx.fill();
+  ctx.strokeStyle='rgba(66,99,235,0.18)'; ctx.lineWidth=1;
+  roundRect(bx-7,by-5,bw+14,bh+10,10); ctx.stroke();
+  const rows=[
+    {lbl:'θ =',val:`${deg}°`,col:'#b82020'},
+    {lbl:'μs =',val:S.mu.toFixed(2),col:'#333'},
+    {lbl:'μk =',val:(S.mu*K_RATIO).toFixed(2),col:'#333'},
+    {lbl:'θcrit =',val:`${crit.toFixed(1)}°`,col:'#333'},
+  ];
+  const LH=19; ctx.textAlign='left';
+  rows.forEach((r,i)=>{
+    ctx.font='11px "Segoe UI",sans-serif'; ctx.fillStyle='#999';
+    ctx.fillText(r.lbl,bx,by+14+i*LH);
+    ctx.font=`bold 12px "Segoe UI",sans-serif`; ctx.fillStyle=r.col;
+    ctx.fillText(r.val,bx+48,by+14+i*LH);
+  });
+  ctx.font='bold 11px "Segoe UI",sans-serif';
+  ctx.fillStyle=willSlide?'#b83030':'#2a7040';
+  ctx.fillText(willSlide?'Will slide':'Static hold',bx,by+14+rows.length*LH+2);
+}
+
+function drawVelocityBar() {
+  if (!S.running||S.vel<0.05) return;
+  const BX=20,BY=CH-14,BW=CW-40,BH=6,pct=Math.min(S.vel/12,1);
+  ctx.fillStyle='rgba(0,0,0,0.07)'; roundRect(BX,BY,BW,BH,3); ctx.fill();
+  const vg=ctx.createLinearGradient(BX,0,BX+BW,0);
+  vg.addColorStop(0,'#38a169'); vg.addColorStop(0.5,'#f59e0b'); vg.addColorStop(1,'#e53e3e');
+  ctx.fillStyle=vg; roundRect(BX,BY,BW*pct,BH,3); ctx.fill();
+  if (pct>0.1) {
+    ctx.font='bold 9px "Segoe UI",sans-serif'; ctx.fillStyle='#fff';
+    ctx.textAlign='right'; ctx.fillText(`${S.vel.toFixed(2)} m/s`,BX+BW*pct-4,BY+BH-1);
+    ctx.textAlign='left';
+  }
+}
+
+// ── MAIN DRAW ─────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0,0,CW,CH);
+  drawBg(); drawSupport(S.angle); drawPlank(S.angle);
+  drawTrail(S.angle,S.pos); drawForces(S.angle,S.pos);
+  drawBlock(S.angle,S.pos); drawAngleArc(S.angle);
+  drawOverlay(S.angle); drawVelocityBar();
+}
+
+// ── PHYSICS ───────────────────────────────────────────────────────
+function physicsStep(dt) {
+  if (dt>0.05) dt=0.05;
+  const th=S.angle*Math.PI/180, μk=S.mu*K_RATIO;
+  if (!S.sliding) {
+    if (Math.tan(th)>S.mu) S.sliding=true;
+    else { S.accel=0; return; }
+  }
+  S.accel=Math.max(0,G*(Math.sin(th)-μk*Math.cos(th)));
+  S.vel+=S.accel*dt; S.pos+=S.vel*dt; S.time+=dt;
+  if (S.pos>=PLANK_M) {
+    S.pos=PLANK_M; S.vel=0; S.accel=0;
+    S.sliding=false; S.finished=true; S.running=false;
+  }
+}
+
+// ── LOOP ─────────────────────────────────────────────────────────
+function loop(ts) {
+  if (!S.running) return;
+  if (S.lastTs===null) S.lastTs=ts;
+  physicsStep((ts-S.lastTs)/1000);
+  S.lastTs=ts;
+  draw(); updateUI();
+  if (S.running) S.animId=requestAnimationFrame(loop);
+  else { draw(); updateUI(); } // final frame
+}
+
+// ── UI ────────────────────────────────────────────────────────────
+function fmt(n,d=2){ return (typeof n==='number'&&isFinite(n))?n.toFixed(d):'—'; }
+
+function updateUI() {
+  const th=S.angle*Math.PI/180, m=S.mass, μk=S.mu*K_RATIO;
+  const W=m*G, N=m*G*Math.cos(th), gC=m*G*Math.sin(th);
+  const fric=S.sliding?μk*N:Math.min(gC,S.mu*N);
+  const net=S.sliding?m*S.accel:0;
+  const crit=Math.atan(S.mu)*180/Math.PI;
+
+  document.getElementById('stAccel').textContent  = fmt(S.sliding||S.finished?S.accel:0);
+  document.getElementById('stVel').textContent    = fmt(S.vel);
+  document.getElementById('stDist').textContent   = fmt(S.pos);
+  document.getElementById('stNet').textContent    = fmt(net);
+  document.getElementById('stWeight').textContent = fmt(W);
+  document.getElementById('stNormal').textContent = fmt(N);
+  document.getElementById('stFric').textContent   = fmt(fric);
+  document.getElementById('stTime').textContent   = fmt(S.time);
+  document.getElementById('muK').textContent      = fmt(μk);
+  document.getElementById('critAngle').textContent = fmt(crit,1)+'°';
+
+  const badge=document.getElementById('statusBadge');
+  const text =document.getElementById('statusText');
+  badge.className='status-badge';
+  if (S.finished) {
+    badge.classList.add('finished');
+    text.textContent=`Finished (reached bottom in ${fmt(S.time)} s)`;
+    document.getElementById('btnStart').disabled=false;
+    document.getElementById('btnStart').textContent='Restart';
+  } else if (S.sliding) {
+    badge.classList.add('sliding');
+    text.textContent=`Sliding (a = ${fmt(S.accel)} m/s²)`;
+  } else if (S.running) {
+    badge.classList.add('static');
+    text.textContent=`Static hold (θ = ${S.angle}°, θcrit = ${fmt(crit,1)}°)`;
+  } else {
+    text.textContent='Ready';
+  }
+}
+
+// ── RESET ────────────────────────────────────────────────────────
+function doReset() {
+  if (S.animId) { cancelAnimationFrame(S.animId); S.animId=null; }
+  S.pos=0; S.vel=0; S.accel=0; S.time=0;
+  S.sliding=false; S.finished=false; S.running=false; S.lastTs=null;
+  const btn=document.getElementById('btnStart');
+  btn.disabled=false; btn.textContent='Start';
+  draw(); updateUI();
+}
+
+// ── EVENTS ───────────────────────────────────────────────────────
+document.getElementById('sAngle').addEventListener('input',function(){
+  S.angle=+this.value;
+  document.getElementById('lblAngle').textContent=S.angle+'°';
+  if (S.running) doReset(); else { draw(); updateUI(); }
+});
+document.getElementById('sMass').addEventListener('input',function(){
+  S.mass=+this.value;
+  document.getElementById('lblMass').textContent=S.mass.toFixed(1)+' kg';
+  draw(); updateUI();
+});
+document.getElementById('selMaterial').addEventListener('change',function(){
+  if (!this.value) return;
+  S.mu=+this.value;
+  document.getElementById('sFriction').value=S.mu;
+  document.getElementById('lblMu').textContent=S.mu.toFixed(2);
+  draw(); updateUI();
+});
+document.getElementById('sFriction').addEventListener('input',function(){
+  S.mu=+this.value;
+  document.getElementById('lblMu').textContent=S.mu.toFixed(2);
+  document.getElementById('selMaterial').value='';
+  draw(); updateUI();
+});
+document.getElementById('btnStart').addEventListener('click',function(){
+  if (S.finished) { doReset(); return; }
+  if (S.running) return;
+  S.running=true; S.lastTs=null; this.disabled=true;
+  S.animId=requestAnimationFrame(loop);
+});
+document.getElementById('btnReset').addEventListener('click',doReset);
+
+// ── INIT ─────────────────────────────────────────────────────────
+draw();
+updateUI();
+</script>
+</body>
+</html>
