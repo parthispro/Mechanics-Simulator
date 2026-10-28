@@ -23,3 +23,4 @@ where:
 
 Open `index.html` in any standard web browser. No server or dependencies required.
 
+ For web-based Expirience u can also visit : https://parthispro.github.io/Mechanics-Simulator/
